@@ -8,7 +8,12 @@ st.title("📊 Relatório Interativo de Reprovações")
 df = pd.read_csv("trypa5.csv", sep=",")
 reprovados = df[df["Situacao"] == "Reprovacao"]
 
-st.markdown("### 📌 Filtros interativos")
+st.markdown("   ### 📌 Filtros interativos")
+
+
+
+
+
 
 # Filtro por curso
 cursos_disponiveis = sorted(reprovados["Curso"].dropna().unique())
