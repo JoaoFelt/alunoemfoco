@@ -1,0 +1,7 @@
+streamlit
+pandas
+selenium
+webdriver_manager
+datetime
+dotenv
+lxml
