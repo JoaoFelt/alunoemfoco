@@ -1,34 +1,53 @@
 import streamlit as st
 import pandas as pd
 
+# 🔹 Controle de estado (tela inicial)
+if "iniciado" not in st.session_state:
+    st.session_state.iniciado = False
+
+# 🔹 Tela inicial
+if not st.session_state.iniciado:
+    st.set_page_config(page_title="Sistema de Reprovações", layout="wide")
+
+    st.title("🎓 Sistema de Reprovações")
+    st.markdown("### Bem-vindo ao sistema")
+
+    st.write("Clique no botão abaixo para acessar o relatório")
+
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        if st.button("🚀 Start"):
+            st.session_state.iniciado = True
+            st.rerun()
+
+    st.stop()
+
+
+# 🔹 CONFIGURAÇÃO DA PÁGINA PRINCIPAL
 st.set_page_config(page_title="Relatório de Reprovações", layout="wide")
 st.title("📊 Relatório Interativo de Reprovações")
 
-# Lê os dados
+# 🔹 Lê os dados
 df = pd.read_csv("trypa5.csv", sep=",")
 reprovados = df[df["Situacao"] == "Reprovacao"]
 
-st.markdown("   ### 📌 Filtros interativos")
+st.markdown("### 📌 Filtros interativos")
 
-
-
-
-
-
-# Filtro por curso
+# 🔹 Filtro por curso
 cursos_disponiveis = sorted(reprovados["Curso"].dropna().unique())
 curso_selecionado = st.selectbox("🎓 Filtrar por curso", ["Todos"] + cursos_disponiveis)
 
-# Aplica o filtro se necessário
 if curso_selecionado != "Todos":
     reprovados = reprovados[reprovados["Curso"] == curso_selecionado]
 
+# 🔹 Filtro por semestre
 semestres = sorted(reprovados["Semestre"].dropna().unique())
 semestre_selecionado = st.selectbox("📆 Filtrar por semestre", ["Todos"] + semestres)
+
 if semestre_selecionado != "Todos":
     reprovados = reprovados[reprovados["Semestre"] == semestre_selecionado]
 
-
+# 🔹 Layout em colunas
 col1, col2 = st.columns(2)
 
 # 🔍 Por aluno
@@ -84,7 +103,6 @@ with col4:
         .rename(columns={"index": "Estudante", "Estudante": "Reprovações"})
     )
     st.dataframe(reprovacoes_alunos)
-
 
 # 📥 Exportação dos dados
 st.markdown("---")
