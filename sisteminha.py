@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Relatório de Reprovações", layout="wide")
-st.title(" Relatório Interativo de Reprovações")
+st.title("📊 Relatório Interativo de Reprovações")
 
 # Lê os dados
 df = pd.read_csv("trypa5.csv", sep=",")
