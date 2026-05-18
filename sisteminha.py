@@ -1,113 +1,262 @@
-import streamlit as st
+from flask import Flask, render_template, request, send_file
 import pandas as pd
+import io
 
-st.set_page_config(page_title="Relatório de Reprovações", layout="wide")
-st.title("📊 Relatório Interativo de Reprovações")
+app = Flask(__name__)
 
-# Lê os dados
+# =========================
+# CARREGA CSV
+# =========================
+
 df = pd.read_csv("trypa5.csv", sep=",")
-reprovados = df[df["Situacao"] == "Reprovacao"]
 
-st.markdown("   ### 📌 Filtros interativos")
-
-
+# filtra reprovações
+reprovados_base = df[df["Situacao"] == "Reprovacao"]
 
 
+# =========================
+# PÁGINA PRINCIPAL
+# =========================
 
+@app.route("/")
+def index():
 
-# Filtro por curso
-cursos_disponiveis = sorted(reprovados["Curso"].dropna().unique())
-curso_selecionado = st.selectbox("🎓 Filtrar por curso", ["Todos"] + cursos_disponiveis)
+    reprovados = reprovados_base.copy()
 
-# Aplica o filtro se necessário
-if curso_selecionado != "Todos":
-    reprovados = reprovados[reprovados["Curso"] == curso_selecionado]
+    # =========================
+    # FILTRO CURSO
+    # =========================
 
-semestres = sorted(reprovados["Semestre"].dropna().unique())
-semestre_selecionado = st.selectbox("📆 Filtrar por semestre", ["Todos"] + semestres)
-if semestre_selecionado != "Todos":
-    reprovados = reprovados[reprovados["Semestre"] == semestre_selecionado]
+    cursos = sorted(
+        reprovados["Curso"].dropna().unique()
+    )
 
+    curso = request.args.get("curso", "Todos")
 
-col1, col2 = st.columns(2)
-
-# 🔍 Por aluno
-with col1:
-    st.subheader("👨‍🎓 Buscar por aluno")
-    lista_alunos = sorted(reprovados["Estudante"].dropna().unique())
-    aluno_escolhido = st.selectbox("Escolha um aluno", lista_alunos)
-
-    if aluno_escolhido:
-        dados_aluno = reprovados[reprovados["Estudante"] == aluno_escolhido][
-            ["Curso", "Semestre", "Unidade Curricular Pendente", "Situacao"]
+    if curso != "Todos":
+        reprovados = reprovados[
+            reprovados["Curso"] == curso
         ]
-        st.write(f"Reprovações de **{aluno_escolhido}**:")
-        st.dataframe(dados_aluno)
 
-# 🔍 Por disciplina
-with col2:
-    st.subheader("📚 Buscar por disciplina")
-    lista_disciplinas = sorted(reprovados["Unidade Curricular Pendente"].dropna().unique())
-    disciplina_escolhida = st.selectbox("Escolha uma disciplina", lista_disciplinas)
+    # =========================
+    # FILTRO SEMESTRE
+    # =========================
 
-    if disciplina_escolhida:
+    semestres = sorted(
+        reprovados["Semestre"].dropna().unique()
+    )
+
+    semestre = request.args.get(
+        "semestre",
+        "Todos"
+    )
+
+    if semestre != "Todos":
+        reprovados = reprovados[
+            reprovados["Semestre"] == semestre
+        ]
+
+    # =========================
+    # BUSCA ALUNO
+    # =========================
+
+    alunos = sorted(
+        reprovados["Estudante"]
+        .dropna()
+        .unique()
+    )
+
+    aluno = request.args.get("aluno", "")
+
+    dados_aluno = None
+
+    if aluno:
+        dados_aluno = reprovados[
+            reprovados["Estudante"] == aluno
+        ][[
+            "Curso",
+            "Semestre",
+            "Unidade Curricular Pendente",
+            "Situacao"
+        ]]
+
+    # =========================
+    # BUSCA DISCIPLINA
+    # =========================
+
+    disciplinas = sorted(
+        reprovados[
+            "Unidade Curricular Pendente"
+        ]
+        .dropna()
+        .unique()
+    )
+
+    disciplina = request.args.get(
+        "disciplina",
+        ""
+    )
+
+    dados_disciplina = None
+
+    if disciplina:
         dados_disciplina = reprovados[
-            reprovados["Unidade Curricular Pendente"] == disciplina_escolhida
-        ][["Curso","Estudante", "Semestre", "Situacao"]]
-        st.write(f"Alunos reprovados em **{disciplina_escolhida}**:")
-        st.dataframe(dados_disciplina)
+            reprovados[
+                "Unidade Curricular Pendente"
+            ] == disciplina
+        ][[
+            "Curso",
+            "Estudante",
+            "Semestre",
+            "Situacao"
+        ]]
 
-# 🔢 Estatísticas adicionais
-st.markdown("---")
-st.subheader("📈 Estatísticas gerais de reprovações")
+    # =========================
+    # ESTATÍSTICAS
+    # =========================
 
-col3, col4 = st.columns(2)
-
-# 📉 Disciplinas com mais reprovações
-with col3:
-    st.markdown("#### 📌 Disciplinas com mais reprovações")
     reprovacoes_disc = (
-        reprovados["Unidade Curricular Pendente"]
+        reprovados[
+            "Unidade Curricular Pendente"
+        ]
         .value_counts()
         .reset_index()
-        .rename(columns={"index": "Disciplina", "Unidade Curricular Pendente": "Reprovações"})
     )
-    st.dataframe(reprovacoes_disc)
 
-# 📉 Alunos com mais reprovações
-with col4:
-    st.markdown("#### 📌 Alunos com mais reprovações")
+    reprovacoes_disc.columns = [
+        "Disciplina",
+        "Reprovações"
+    ]
+
     reprovacoes_alunos = (
         reprovados["Estudante"]
         .value_counts()
         .reset_index()
-        .rename(columns={"index": "Estudante", "Estudante": "Reprovações"})
-    )
-    st.dataframe(reprovacoes_alunos)
-
-
-# 📥 Exportação dos dados
-st.markdown("---")
-st.subheader("📥 Exportar dados completos")
-
-col5, col6 = st.columns(2)
-
-with col5:
-    csv_alunos = reprovados[["Estudante", "Unidade Curricular Pendente", "Situacao", "Semestre"]]
-    csv_bytes_alunos = csv_alunos.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "⬇️ Baixar relatório por aluno",
-        data=csv_bytes_alunos,
-        file_name="reprovacoes_por_aluno.csv",
-        mime="text/csv"
     )
 
-with col6:
-    csv_disciplinas = reprovados[["Unidade Curricular Pendente", "Estudante", "Situacao", "Semestre"]]
-    csv_bytes_disciplinas = csv_disciplinas.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "⬇️ Baixar relatório por disciplina",
-        data=csv_bytes_disciplinas,
-        file_name="reprovacoes_por_disciplina.csv",
-        mime="text/csv"
+    reprovacoes_alunos.columns = [
+        "Estudante",
+        "Reprovações"
+    ]
+
+    return render_template(
+        "index.html",
+
+        cursos=cursos,
+        curso=curso,
+
+        semestres=semestres,
+        semestre=semestre,
+
+        alunos=alunos,
+        aluno=aluno,
+
+        disciplinas=disciplinas,
+        disciplina=disciplina,
+
+        dados_aluno=(
+            dados_aluno.to_dict(
+                orient="records"
+            )
+            if dados_aluno is not None
+            else None
+        ),
+
+        dados_disciplina=(
+            dados_disciplina.to_dict(
+                orient="records"
+            )
+            if dados_disciplina is not None
+            else None
+        ),
+
+        reprovacoes_disc=(
+            reprovacoes_disc.to_dict(
+                orient="records"
+            )
+        ),
+
+        reprovacoes_alunos=(
+            reprovacoes_alunos.to_dict(
+                orient="records"
+            )
+        )
     )
+
+
+# =========================
+# EXPORTAR CSV ALUNOS
+# =========================
+
+@app.route("/download/alunos")
+def download_alunos():
+
+    output = io.StringIO()
+
+    csv_alunos = reprovados_base[[
+        "Estudante",
+        "Unidade Curricular Pendente",
+        "Situacao",
+        "Semestre"
+    ]]
+
+    csv_alunos.to_csv(
+        output,
+        index=False
+    )
+
+    mem = io.BytesIO()
+
+    mem.write(output.getvalue().encode("utf-8"))
+
+    mem.seek(0)
+
+    return send_file(
+        mem,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="reprovacoes_alunos.csv"
+    )
+
+
+# =========================
+# EXPORTAR CSV DISCIPLINAS
+# =========================
+
+@app.route("/download/disciplinas")
+def download_disciplinas():
+
+    output = io.StringIO()
+
+    csv_disc = reprovados_base[[
+        "Unidade Curricular Pendente",
+        "Estudante",
+        "Situacao",
+        "Semestre"
+    ]]
+
+    csv_disc.to_csv(
+        output,
+        index=False
+    )
+
+    mem = io.BytesIO()
+
+    mem.write(output.getvalue().encode("utf-8"))
+
+    mem.seek(0)
+
+    return send_file(
+        mem,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="reprovacoes_disciplinas.csv"
+    )
+
+
+# =========================
+# INICIAR
+# =========================
+
+if __name__ == "__main__":
+    app.run(debug=True)
