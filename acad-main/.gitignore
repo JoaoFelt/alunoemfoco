@@ -1,0 +1,5 @@
+*.csv
+*.xls
+*.env
+*.crdownload
+!trypa5.csv
