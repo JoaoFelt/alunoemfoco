@@ -1,17 +1,16 @@
 from flask import Flask, render_template, request, send_file
 import pandas as pd
+import sqlite3
 import io
 
 app = Flask(__name__)
 
 # =========================
-# CARREGA CSV
+# CONEXÃO SQLITE
 # =========================
 
-df = pd.read_csv("trypa5.csv", sep=",")
-
-# filtra reprovações
-reprovados_base = df[df["Situacao"] == "Reprovacao"]
+def get_connection():
+    return sqlite3.connect("academico.db")
 
 
 # =========================
@@ -21,19 +20,37 @@ reprovados_base = df[df["Situacao"] == "Reprovacao"]
 @app.route("/")
 def index():
 
-    reprovados = reprovados_base.copy()
+    conn = get_connection()
+
+    # =========================
+    # BUSCA BASE
+    # =========================
+
+    query = """
+        SELECT *
+        FROM reprovacoes
+        WHERE Situacao = 'Reprovacao'
+    """
+
+    reprovados = pd.read_sql_query(query, conn)
 
     # =========================
     # FILTRO CURSO
     # =========================
 
     cursos = sorted(
-        reprovados["Curso"].dropna().unique()
+        reprovados["Curso"]
+        .dropna()
+        .unique()
     )
 
-    curso = request.args.get("curso", "Todos")
+    curso = request.args.get(
+        "curso",
+        "Todos"
+    )
 
     if curso != "Todos":
+
         reprovados = reprovados[
             reprovados["Curso"] == curso
         ]
@@ -43,7 +60,9 @@ def index():
     # =========================
 
     semestres = sorted(
-        reprovados["Semestre"].dropna().unique()
+        reprovados["Semestre"]
+        .dropna()
+        .unique()
     )
 
     semestre = request.args.get(
@@ -52,6 +71,7 @@ def index():
     )
 
     if semestre != "Todos":
+
         reprovados = reprovados[
             reprovados["Semestre"] == semestre
         ]
@@ -66,11 +86,15 @@ def index():
         .unique()
     )
 
-    aluno = request.args.get("aluno", "")
+    aluno = request.args.get(
+        "aluno",
+        ""
+    )
 
     dados_aluno = None
 
     if aluno:
+
         dados_aluno = reprovados[
             reprovados["Estudante"] == aluno
         ][[
@@ -100,6 +124,7 @@ def index():
     dados_disciplina = None
 
     if disciplina:
+
         dados_disciplina = reprovados[
             reprovados[
                 "Unidade Curricular Pendente"
@@ -129,7 +154,9 @@ def index():
     ]
 
     reprovacoes_alunos = (
-        reprovados["Estudante"]
+        reprovados[
+            "Estudante"
+        ]
         .value_counts()
         .reset_index()
     )
@@ -138,6 +165,8 @@ def index():
         "Estudante",
         "Reprovações"
     ]
+
+    conn.close()
 
     return render_template(
         "index.html",
@@ -155,28 +184,34 @@ def index():
         disciplina=disciplina,
 
         dados_aluno=(
+
             dados_aluno.to_dict(
                 orient="records"
             )
+
             if dados_aluno is not None
             else None
         ),
 
         dados_disciplina=(
+
             dados_disciplina.to_dict(
                 orient="records"
             )
+
             if dados_disciplina is not None
             else None
         ),
 
         reprovacoes_disc=(
+
             reprovacoes_disc.to_dict(
                 orient="records"
             )
         ),
 
         reprovacoes_alunos=(
+
             reprovacoes_alunos.to_dict(
                 orient="records"
             )
@@ -191,14 +226,26 @@ def index():
 @app.route("/download/alunos")
 def download_alunos():
 
-    output = io.StringIO()
+    conn = get_connection()
 
-    csv_alunos = reprovados_base[[
-        "Estudante",
-        "Unidade Curricular Pendente",
-        "Situacao",
-        "Semestre"
-    ]]
+    query = """
+        SELECT
+            Estudante,
+            [Unidade Curricular Pendente],
+            Situacao,
+            Semestre
+        FROM reprovacoes
+        WHERE Situacao = 'Reprovacao'
+    """
+
+    csv_alunos = pd.read_sql_query(
+        query,
+        conn
+    )
+
+    conn.close()
+
+    output = io.StringIO()
 
     csv_alunos.to_csv(
         output,
@@ -207,7 +254,9 @@ def download_alunos():
 
     mem = io.BytesIO()
 
-    mem.write(output.getvalue().encode("utf-8"))
+    mem.write(
+        output.getvalue().encode("utf-8")
+    )
 
     mem.seek(0)
 
@@ -226,14 +275,26 @@ def download_alunos():
 @app.route("/download/disciplinas")
 def download_disciplinas():
 
-    output = io.StringIO()
+    conn = get_connection()
 
-    csv_disc = reprovados_base[[
-        "Unidade Curricular Pendente",
-        "Estudante",
-        "Situacao",
-        "Semestre"
-    ]]
+    query = """
+        SELECT
+            [Unidade Curricular Pendente],
+            Estudante,
+            Situacao,
+            Semestre
+        FROM reprovacoes
+        WHERE Situacao = 'Reprovacao'
+    """
+
+    csv_disc = pd.read_sql_query(
+        query,
+        conn
+    )
+
+    conn.close()
+
+    output = io.StringIO()
 
     csv_disc.to_csv(
         output,
@@ -242,7 +303,9 @@ def download_disciplinas():
 
     mem = io.BytesIO()
 
-    mem.write(output.getvalue().encode("utf-8"))
+    mem.write(
+        output.getvalue().encode("utf-8")
+    )
 
     mem.seek(0)
 
